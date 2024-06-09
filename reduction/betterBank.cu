@@ -3,35 +3,28 @@
 #include <stdio.h>
 #include <time.h>
 
-__global__ void TwoPassSimpleKernel(const float* input, float* part_sum, size_t n) {
-    extern __shared__ float shm[];
-    size_t block_size = n / gridDim.x;
-    size_t blk_start = block_size * blockIdx.x;
-    size_t blk_end = min(n, blk_start + block_size);
-    
-    input += blk_start;
-    part_sum += blockIdx.x;
-
-    size_t thread_size = block_size / blockDim.x;
-    size_t thr_begin = threadIdx.x * thread_size;
-    size_t thr_end = min(block_size, thr_begin + thread_size);
+__global__ void TwoPassInterleavedKernel(const float* input, float* part_sum, size_t n){
+    int32_t gtid = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t total_thread_num = gridDim.x * blockDim.x;
 
     double sum = 0.0f;
-    for (size_t i = thr_begin; i < thr_end; i++) {
+    for (int32_t i = gtid; i<n; i += total_thread_num){
         sum += input[i];
     }
+
+    extern __shared__ float shm[];
     shm[threadIdx.x] = sum;
     __syncthreads();
-    sum = 0.0f;
-    if (threadIdx.x == 0) {
-        for (size_t i = 0; i < blockDim.x; ++i) {
+    if (threadIdx.x == 0){
+        sum = 0.0f;
+        for (size_t i=0; i < blockDim.x; ++i){
             sum += shm[i];
         }
-        *part_sum = sum;
+        part_sum[blockIdx.x] = sum;
     }
-} 
+}
 
-void ReduceByTwoPass(const float* input, float* sum, size_t n) {
+void ReduceByTwoPassWithBetterAddress(const float* input, float* sum, size_t n) {
     const int32_t thread_num_per_block = 1024;  // tuned
     int32_t block_num = (n - 1) / thread_num_per_block + 1;
     block_num = min(block_num, 1024);
@@ -53,7 +46,7 @@ void ReduceByTwoPass(const float* input, float* sum, size_t n) {
     size_t shm_size = thread_num_per_block * sizeof(float);  // float per thread
     clock_t start1 = clock();
 
-    TwoPassSimpleKernel<<<block_num, thread_num_per_block, shm_size>>>(d_input, d_part, n);
+    TwoPassInterleavedKernel<<<block_num, thread_num_per_block, shm_size>>>(d_input, d_part, n);
 
     cudaMemcpy(part, d_part, block_num*sizeof(float), cudaMemcpyDeviceToHost);
     
@@ -65,9 +58,9 @@ void ReduceByTwoPass(const float* input, float* sum, size_t n) {
     //     printf("part(%d): %f\n", i, part[i]);
     // }
     // printf("%d\n", block_num);
-    TwoPassSimpleKernel<<<1, block_num, shm_size>>>(d_part, d_output, block_num);
+    TwoPassInterleavedKernel<<<1, block_num, shm_size>>>(d_part, d_output, block_num);
     clock_t end2 = clock();
-    printf("ReduceByTwoPass\ncalculation time: %fus\n", (double)(end2 - start1) / CLOCKS_PER_SEC * 1000 * 1000);
+    printf("ReduceByTwoPassWithBetterAddress\ncalculation time: %fus\n", (double)(end2 - start1) / CLOCKS_PER_SEC * 1000 * 1000);
     
     cudaMemcpy(sum, d_output, sizeof(float), cudaMemcpyDeviceToHost);
     clock_t end = clock();

@@ -11,13 +11,16 @@
 void generate_array(float* array, int N);
 void ReduceByKernel(const float* input, float* output, size_t n);
 void ReduceByTwoPass(const float* input, float* sum, size_t n);
+void ReduceByTwoPassWithBetterAddress(const float* input, float* sum, size_t n);
+void ReduceByTwoPassSharedOptimizedKernel(const float* input, float* sum, size_t n);
+void ReduceByTwoPassWarpSyncKernel(const float* input, float* sum, size_t n);
 
 int main(){
     float* array = new float[TEST];
     float* output = new float;
     generate_array(array,TEST);
     printf("ARRAY: %f\n", array[0]);
-    float sum =0.0;
+    double sum =0.0;
     clock_t start = clock();
     for (int i = 0 ;i<TEST;++i){
         sum+=array[i];
@@ -38,18 +41,28 @@ int main(){
   
     printf("ARRAY SUM: %f\n", sum);
 
-    ReduceByKernel(array, output, TEST);
-    printf("OUTPUT: %f\n", *output);
+    // ReduceByKernel(array, output, TEST);
+    // printf("OUTPUT: %f\n", *output);
 
     output = new float;
 
     for (int times =0 ; times < 10; times++){
-        printf("\n\n\nTIMES %d \n\n\n", times);
-        ReduceByTwoPass(array, output, TEST);
-        printf("OUTPUT: %f\n", *output);
+        printf("\n\n\nTIMES %d \n", times+1);
 
         ReduceByKernel(array, output, TEST);
-        printf("OUTPUT: %f\n", *output);
+        printf("OUTPUT: %f\n\n", *output);
+
+        ReduceByTwoPass(array, output, TEST);
+        printf("OUTPUT: %f\n\n", *output);
+
+        ReduceByTwoPassWithBetterAddress(array, output, TEST);
+        printf("OUTPUT: %f\n\n", *output);
+
+        ReduceByTwoPassSharedOptimizedKernel(array, output, TEST);
+        printf("OUTPUT: %f\n\n", *output);
+
+        ReduceByTwoPassWarpSyncKernel(array, output, TEST);
+        printf("OUTPUT: %f\n\n", *output);
     }
 
     delete[] array;

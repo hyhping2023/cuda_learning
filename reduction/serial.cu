@@ -8,7 +8,7 @@
 #define BLOCK_SIZE 1024
 
 __global__ void SerialKernel(const float* input, float* output, size_t n) {
-    float sum = 0.0f;
+    double sum = 0.0f;
     for (size_t i = 0; i < n; i++) {
         sum += input[i];
     }
@@ -30,6 +30,7 @@ void ReduceByKernel(const float* input, float* output, size_t n) {
     clock_t end = clock();
     printf("ReduceByKernel\ncalculation time: %fus\n", (double)(end2 - start2) / CLOCKS_PER_SEC * 1000 * 1000);
     printf("I/O time: %fus\n", (double)(end - end2 + start2 - start) / CLOCKS_PER_SEC * 1000 * 1000);
+    printf("Total time: %fus\n", (double)(end - start) / CLOCKS_PER_SEC * 1000 * 1000);
     cudaFree(d_input);
     cudaFree(d_output);
 }
@@ -38,8 +39,8 @@ void ReduceByKernel(const float* input, float* output, size_t n) {
 __global__ void cudaGenRandomNumArray(float* array, int N, curandState* states){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index < N){
-        curand_init(index, index, 0, &states[index]);
-        array[index] = 0.125;//(int)(curand_uniform(&states[index])*10);
+        curand_init(0, index, 0, &states[index]);
+        array[index] = ((int)(curand_uniform(&states[index]) * 2.0)) / 8.0;
     }
 }
 
