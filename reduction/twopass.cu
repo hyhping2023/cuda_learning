@@ -35,6 +35,7 @@ void ReduceByTwoPass(const float* input, float* sum, size_t n) {
     const int32_t thread_num_per_block = 1024;  // tuned
     int32_t block_num = (n - 1) / thread_num_per_block + 1;
     block_num = min(block_num, 1024);
+    
     // the first pass reduce input[0:n] to part[0:block_num]
     // part_sum[i] stands for the result of i-th block
 
@@ -53,7 +54,18 @@ void ReduceByTwoPass(const float* input, float* sum, size_t n) {
     clock_t start1 = clock();
 
     TwoPassSimpleKernel<<<block_num, thread_num_per_block, shm_size>>>(d_input, d_part, n);
-    TwoPassSimpleKernel<<<1, thread_num_per_block, shm_size>>>(d_part, d_output, block_num * thread_num_per_block);
+
+    cudaMemcpy(part, d_part, block_num*sizeof(float), cudaMemcpyDeviceToHost);
+    
+    // for (int i = 0; i < block_num; ++i){
+    //     if (part[i] == 0){
+    //         printf("part(%d): %f\n", i, part[i]);
+    //         break;
+    //     }
+    //     printf("part(%d): %f\n", i, part[i]);
+    // }
+    // printf("%d\n", block_num);
+    TwoPassSimpleKernel<<<1, block_num, shm_size>>>(d_part, d_output, block_num);
     clock_t end2 = clock();
     printf("ReduceByTwoPass\ncalculation time: %fus\n", (double)(end2 - start1) / CLOCKS_PER_SEC * 1000 * 1000);
     

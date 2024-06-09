@@ -39,7 +39,7 @@ __global__ void cudaGenRandomNumArray(float* array, int N, curandState* states){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index < N){
         curand_init(index, index, 0, &states[index]);
-        array[index] = curand_uniform(&states[index]);
+        array[index] = 0.125;//(int)(curand_uniform(&states[index])*10);
     }
 }
 
